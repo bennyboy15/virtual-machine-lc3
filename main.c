@@ -51,6 +51,16 @@ enum
     FL_NEG = 1 << 2, /* N */
 };
 
+enum
+{
+    TRAP_GETC  = 0x20,
+    TRAP_OUT   = 0x21,
+    TRAP_PUTS  = 0x22,
+    TRAP_IN    = 0x23,
+    TRAP_PUTSP = 0x24,
+    TRAP_HALT  = 0x25,
+};
+
 // Pads to 16 bit. 0s = positive value, 1s = negative value
 uint16_t sign_extend(uint16_t x, int bit_count)
 {
@@ -176,13 +186,39 @@ int main(int argc, const char *argv[])
         break;
 
         case OP_BR:
-            @{ BR } break;
+        {
+            uint16_t cond_flag = (instr >> 9) & 0x7;
+            uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+            if (cond_flag & reg[R_COND])
+            {
+                reg[R_PC] += pc_offset;
+            }
+        }
+        break;
 
         case OP_JMP:
-            @{ JMP } break;
+        {
+            uint16_t base_r = (instr >> 6) & 0x7;
+            reg[R_PC] = reg[base_r];
+        }
+        break;
 
         case OP_JSR:
-            @{ JSR } break;
+        {
+            uint16_t long_flag = (instr >> 11) & 1;
+            reg[R_R7] = reg[R_PC];
+            if (long_flag)
+            {
+                uint16_t long_pc_offset = sign_extend(instr & 0x7FF, 11);
+                reg[R_PC] += long_pc_offset;
+            }
+            else
+            {
+                uint16_t base_r = (instr >> 6) & 0x7;
+                reg[R_PC] = reg[base_r];
+            }
+        }
+        break;
 
         case OP_LD:
         {
@@ -251,7 +287,61 @@ int main(int argc, const char *argv[])
         break;
 
         case OP_TRAP:
-            @{ TRAP } break;
+        {
+            reg[R_R7] = reg[R_PC];
+            switch (instr & 0xFF)
+            {
+                case TRAP_GETC:
+                    reg[R_R0] = (uint16_t)getchar();
+                    update_flags(R_R0);
+                    break;
+                case TRAP_OUT:
+                    putc((char)reg[R_R0], stdout);
+                    fflush(stdout);
+                    break;
+                case TRAP_PUTS:
+                {
+                    uint16_t *c = memory + reg[R_R0];
+                    while (*c)
+                    {
+                        putc((char)*c, stdout);
+                        ++c;
+                    }
+                    fflush(stdout);
+                }
+                break;
+                case TRAP_IN:
+                {
+                    printf("Enter a character: ");
+                    char ch = getchar();
+                    putc(ch, stdout);
+                    fflush(stdout);
+                    reg[R_R0] = (uint16_t)ch;
+                    update_flags(R_R0);
+                }
+                break;
+                case TRAP_PUTSP:
+                {
+                    uint16_t *c = memory + reg[R_R0];
+                    while (*c)
+                    {
+                        char char1 = (*c) & 0xFF;
+                        putc(char1, stdout);
+                        char char2 = (*c) >> 8;
+                        if (char2) putc(char2, stdout);
+                        ++c;
+                    }
+                    fflush(stdout);
+                }
+                break;
+                case TRAP_HALT:
+                    puts("HALT");
+                    fflush(stdout);
+                    running = 0;
+                    break;
+            }
+        }
+        break;
 
         case OP_RES:
             exit(1);
