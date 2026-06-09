@@ -74,6 +74,10 @@ enum
 // REGISTERS ARRAY
 uint16_t reg[R_COUNT];
 
+// Forward declarations
+void restore_input_buffering();
+uint16_t check_key();
+
 // Pads to 16 bit. 0s = positive value, 1s = negative value
 uint16_t sign_extend(uint16_t x, int bit_count)
 {
@@ -98,6 +102,14 @@ void update_flags(uint16_t r)
     {
         reg[R_COND] = FL_POS;
     }
+}
+
+// SIGNAL INTERRUPT
+void handle_interrupt(int signal)
+{
+    restore_input_buffering();
+    printf("\n");
+    exit(-2);
 }
 
 // READ IMAGE FILE
@@ -208,8 +220,6 @@ int main(int argc, const char *argv[])
             exit(1);
         }
     }
-
-    @{Setup}
 
     /* since exactly one condition flag should be set at any given time, set the Z flag */
     reg[R_COND] = FL_ZRO;
@@ -445,14 +455,17 @@ int main(int argc, const char *argv[])
         break;
 
         case OP_RES:
+            restore_input_buffering();
             exit(1);
 
         case OP_RTI:
+            restore_input_buffering();
             exit(1);
 
         default:
             break;
         }
     }
+    restore_input_buffering();
     exit(0);
 }
