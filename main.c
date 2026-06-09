@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define MEMORY_MAX (1 << 16)
 uint16_t memory[MEMORY_MAX]; /* 65536 locations */
@@ -53,13 +55,16 @@ enum
 
 enum
 {
-    TRAP_GETC  = 0x20,
-    TRAP_OUT   = 0x21,
-    TRAP_PUTS  = 0x22,
-    TRAP_IN    = 0x23,
+    TRAP_GETC = 0x20,
+    TRAP_OUT = 0x21,
+    TRAP_PUTS = 0x22,
+    TRAP_IN = 0x23,
     TRAP_PUTSP = 0x24,
-    TRAP_HALT  = 0x25,
+    TRAP_HALT = 0x25,
 };
+
+// REGISTERS ARRAY
+uint16_t reg[R_COUNT];
 
 // Pads to 16 bit. 0s = positive value, 1s = negative value
 uint16_t sign_extend(uint16_t x, int bit_count)
@@ -87,8 +92,42 @@ void update_flags(uint16_t r)
     }
 }
 
-// REGISTERS ARRAY
-uint16_t reg[R_COUNT];
+uint16_t swap16(uint16_t x)
+{
+    return (x << 8) | (x >> 8);
+}
+
+void read_image_file(FILE *file)
+{
+    /* the origin tells us where in memory to place the image */
+    uint16_t origin;
+    fread(&origin, sizeof(origin), 1, file);
+    origin = swap16(origin);
+
+    /* we know the maximum file size so we only need one fread */
+    uint16_t max_read = MEMORY_MAX - origin;
+    uint16_t *p = memory + origin;
+    size_t read = fread(p, sizeof(uint16_t), max_read, file);
+
+    /* swap to little endian */
+    while (read-- > 0)
+    {
+        *p = swap16(*p);
+        ++p;
+    }
+}
+
+int read_image(const char *image_path)
+{
+    FILE *file = fopen(image_path, "rb");
+    if (!file)
+    {
+        return 0;
+    };
+    read_image_file(file);
+    fclose(file);
+    return 1;
+}
 
 int main(int argc, const char *argv[])
 {
@@ -291,54 +330,55 @@ int main(int argc, const char *argv[])
             reg[R_R7] = reg[R_PC];
             switch (instr & 0xFF)
             {
-                case TRAP_GETC:
-                    reg[R_R0] = (uint16_t)getchar();
-                    update_flags(R_R0);
-                    break;
-                case TRAP_OUT:
-                    putc((char)reg[R_R0], stdout);
-                    fflush(stdout);
-                    break;
-                case TRAP_PUTS:
-                {
-                    uint16_t *c = memory + reg[R_R0];
-                    while (*c)
-                    {
-                        putc((char)*c, stdout);
-                        ++c;
-                    }
-                    fflush(stdout);
-                }
+            case TRAP_GETC:
+                reg[R_R0] = (uint16_t)getchar();
+                update_flags(R_R0);
                 break;
-                case TRAP_IN:
-                {
-                    printf("Enter a character: ");
-                    char ch = getchar();
-                    putc(ch, stdout);
-                    fflush(stdout);
-                    reg[R_R0] = (uint16_t)ch;
-                    update_flags(R_R0);
-                }
+            case TRAP_OUT:
+                putc((char)reg[R_R0], stdout);
+                fflush(stdout);
                 break;
-                case TRAP_PUTSP:
+            case TRAP_PUTS:
+            {
+                uint16_t *c = memory + reg[R_R0];
+                while (*c)
                 {
-                    uint16_t *c = memory + reg[R_R0];
-                    while (*c)
-                    {
-                        char char1 = (*c) & 0xFF;
-                        putc(char1, stdout);
-                        char char2 = (*c) >> 8;
-                        if (char2) putc(char2, stdout);
-                        ++c;
-                    }
-                    fflush(stdout);
+                    putc((char)*c, stdout);
+                    ++c;
                 }
+                fflush(stdout);
+            }
+            break;
+            case TRAP_IN:
+            {
+                printf("Enter a character: ");
+                char ch = getchar();
+                putc(ch, stdout);
+                fflush(stdout);
+                reg[R_R0] = (uint16_t)ch;
+                update_flags(R_R0);
+            }
+            break;
+            case TRAP_PUTSP:
+            {
+                uint16_t *c = memory + reg[R_R0];
+                while (*c)
+                {
+                    char char1 = (*c) & 0xFF;
+                    putc(char1, stdout);
+                    char char2 = (*c) >> 8;
+                    if (char2)
+                        putc(char2, stdout);
+                    ++c;
+                }
+                fflush(stdout);
+            }
+            break;
+            case TRAP_HALT:
+                puts("HALT");
+                fflush(stdout);
+                running = 0;
                 break;
-                case TRAP_HALT:
-                    puts("HALT");
-                    fflush(stdout);
-                    running = 0;
-                    break;
             }
         }
         break;
