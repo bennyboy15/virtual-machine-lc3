@@ -205,6 +205,7 @@ int main(int argc, const char *argv[])
             update_flags(r0);
         }
         break;
+
         case OP_LDR:
         {
             uint16_t dr = (instr >> 9) & 0x7;
@@ -233,7 +234,12 @@ int main(int argc, const char *argv[])
         break;
 
         case OP_STI:
-            @{ STI } break;
+        {
+            uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+            uint16_t sr = (instr >> 9) & 0x7;
+            mem_write(mem_read(reg[R_PC] + pc_offset), reg[sr]);
+        }
+        break;
 
         case OP_STR:
             @{ STR } break;
@@ -243,11 +249,13 @@ int main(int argc, const char *argv[])
 
         case OP_RES:
             exit(1);
+
         case OP_RTI:
             exit(1);
+
         default:
-            @{ BAD OPCODE } break;
+            break;
         }
     }
-    @{ Shutdown }
+    exit(0);
 }
