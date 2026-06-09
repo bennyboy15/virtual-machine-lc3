@@ -80,7 +80,7 @@ void update_flags(uint16_t r)
 // REGISTERS ARRAY
 uint16_t reg[R_COUNT];
 
-int main(int argc, const char* argv[])
+int main(int argc, const char *argv[])
 {
 
     // LOAD ARGUMENTS
@@ -121,7 +121,8 @@ int main(int argc, const char* argv[])
 
         switch (op)
         {
-        case OP_ADD: {
+        case OP_ADD:
+        {
             /* destination register (DR) */
             uint16_t r0 = (instr >> 9) & 0x7;
             /* first operand (SR1) */
@@ -143,19 +144,51 @@ int main(int argc, const char* argv[])
             update_flags(r0);
         }
         break;
+
         case OP_AND:
-            @{ AND } break;
+        {
+            uint16_t r0 = (instr >> 9) & 0x7;
+            uint16_t r1 = (instr >> 6) & 0x7;
+            uint16_t imm_flag = (instr >> 5) & 0x1;
+
+            if (imm_flag)
+            {
+                uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                reg[r0] = reg[r1] & imm5;
+            }
+            else
+            {
+                uint16_t r2 = instr & 0x7;
+                reg[r0] = reg[r1] & reg[r2];
+            }
+            update_flags(r0);
+        }
+        break;
+
         case OP_NOT:
-            @{ NOT } break;
+        {
+            uint16_t r0 = (instr >> 9) & 0x7;
+            uint16_t r1 = (instr >> 6) & 0x7;
+
+            reg[r0] = ~reg[r1];
+            update_flags(r0);
+        }
+        break;
+
         case OP_BR:
             @{ BR } break;
+
         case OP_JMP:
             @{ JMP } break;
+
         case OP_JSR:
             @{ JSR } break;
+
         case OP_LD:
             @{ LD } break;
-        case OP_LDI: {
+
+        case OP_LDI:
+        {
             /* destination register (DR) */
             uint16_t r0 = (instr >> 9) & 0x7;
             /* PCoffset 9*/
@@ -167,18 +200,32 @@ int main(int argc, const char* argv[])
         break;
         case OP_LDR:
             @{ LDR } break;
+
         case OP_LEA:
-            @{ LEA } break;
+        {
+            uint16_t r0 = (instr >> 9) & 0x7;
+            uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+            reg[r0] = reg[R_PC] + pc_offset;
+            update_flags(r0);
+        }
+        break;
+
         case OP_ST:
             @{ ST } break;
+
         case OP_STI:
             @{ STI } break;
+
         case OP_STR:
             @{ STR } break;
+
         case OP_TRAP:
             @{ TRAP } break;
+
         case OP_RES:
+            exit(1);
         case OP_RTI:
+            exit(1);
         default:
             @{ BAD OPCODE } break;
         }
