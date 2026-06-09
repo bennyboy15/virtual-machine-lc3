@@ -185,7 +185,14 @@ int main(int argc, const char *argv[])
             @{ JSR } break;
 
         case OP_LD:
-            @{ LD } break;
+        {
+            uint16_t dr = (instr >> 9) & 0x7;
+            uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+
+            reg[dr] = mem_read(reg[R_PC] + pc_offset);
+            update_flags(dr);
+        }
+        break;
 
         case OP_LDI:
         {
